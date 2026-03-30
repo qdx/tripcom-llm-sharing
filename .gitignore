@@ -5,6 +5,7 @@ dist/
 *.pyc
 .DS_Store
 venv/
+.venv/
 *.egg-info/
 .ipynb_checkpoints/
 outputs/hidden_states/
