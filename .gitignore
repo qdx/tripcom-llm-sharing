@@ -9,3 +9,5 @@ venv/
 *.egg-info/
 .ipynb_checkpoints/
 outputs/hidden_states/
+outputs/*.html
+!outputs/pca_trajectories.json

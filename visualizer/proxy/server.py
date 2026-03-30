@@ -8,6 +8,7 @@ import json
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -216,6 +217,22 @@ async def set_mode(request: Request):
     current_mode = body.get("mode", "simple")
     await broadcast_state()
     return {"ok": True, "mode": current_mode}
+
+
+# ---------------------------------------------------------------------------
+# GET /pca-data — serve pre-computed PCA trajectory data
+# ---------------------------------------------------------------------------
+PCA_DATA_PATH = Path(__file__).parent.parent / "outputs" / "pca_trajectories.json"
+
+@app.get("/pca-data")
+async def get_pca_data():
+    if not PCA_DATA_PATH.exists():
+        return JSONResponse(
+            {"error": "PCA data not found. Run scripts/generate_pca_data.py first."},
+            status_code=404,
+        )
+    with open(PCA_DATA_PATH) as f:
+        return json.load(f)
 
 
 if __name__ == "__main__":
