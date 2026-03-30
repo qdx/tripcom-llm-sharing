@@ -1,0 +1,44 @@
+{
+  "Arithmetic": {
+    "Direct": {
+      "path_length_pca2d": 600.723,
+      "start_end_distance": 507.849,
+      "tortuosity": 1.183,
+      "n_tokens": 15
+    },
+    "CoT": {
+      "path_length_pca2d": 627.448,
+      "start_end_distance": 546.53,
+      "tortuosity": 1.148,
+      "n_tokens": 55
+    }
+  },
+  "Subtraction": {
+    "Direct_multi": {
+      "path_length_pca2d": 557.543,
+      "start_end_distance": 473.061,
+      "tortuosity": 1.179,
+      "n_tokens": 23
+    },
+    "CoT_multi": {
+      "path_length_pca2d": 587.482,
+      "start_end_distance": 509.356,
+      "tortuosity": 1.153,
+      "n_tokens": 51
+    }
+  },
+  "Logic": {
+    "Direct_logic": {
+      "path_length_pca2d": 607.78,
+      "start_end_distance": 524.908,
+      "tortuosity": 1.158,
+      "n_tokens": 27
+    },
+    "CoT_logic": {
+      "path_length_pca2d": 562.076,
+      "start_end_distance": 492.631,
+      "tortuosity": 1.141,
+      "n_tokens": 81
+    }
+  }
+}

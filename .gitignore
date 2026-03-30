@@ -8,3 +8,10 @@ venv/
 *.egg-info/
 .ipynb_checkpoints/
 outputs/hidden_states/
+
+# Python virtualenvs
+venv/
+.venv/
+
+# Generated outputs (re-generate with demos/ scripts)
+outputs/
