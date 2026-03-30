@@ -4,3 +4,7 @@ dist/
 .env
 *.pyc
 .DS_Store
+venv/
+*.egg-info/
+.ipynb_checkpoints/
+outputs/hidden_states/
