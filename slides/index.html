@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>From Prompt Engineering to Harness Engineering — Trip.com Tech Sharing</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <style>
+    :root {
+      /* Context window visualizer color palette */
+      --cw-system: #6366f1;    /* indigo — system messages */
+      --cw-user: #22c55e;      /* green — user messages */
+      --cw-assistant: #eab308; /* amber — assistant messages */
+      --cw-tool-call: #f43f5e; /* rose — tool_call */
+      --cw-tool-resp: #f97316; /* orange — tool response */
+      --cw-bg: #0f172a;        /* slate-900 */
+      --cw-surface: #1e293b;   /* slate-800 */
+      --cw-border: #334155;    /* slate-700 */
+      --cw-text: #e2e8f0;      /* slate-200 */
+      --cw-muted: #94a3b8;     /* slate-400 */
+    }
+
+    .reveal {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--cw-text);
+    }
+
+    .reveal .slides {
+      text-align: left;
+    }
+
+    .reveal .slides section {
+      background: var(--cw-bg);
+    }
+
+    .reveal h1, .reveal h2, .reveal h3 {
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: -0.02em;
+    }
+
+    .reveal h1 { font-size: 2.2em; color: #fff; }
+    .reveal h2 { font-size: 1.6em; color: #fff; }
+    .reveal h3 { font-size: 1.2em; color: var(--cw-muted); }
+
+    .reveal p, .reveal li {
+      font-size: 0.85em;
+      line-height: 1.6;
+      color: var(--cw-text);
+    }
+
+    .reveal .small { font-size: 0.7em; color: var(--cw-muted); }
+
+    /* Context window block styling */
+    .cw-block {
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 8px 0;
+      border-left: 4px solid;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.75em;
+      line-height: 1.5;
+    }
+    .cw-system   { background: rgba(99,102,241,0.15); border-color: var(--cw-system); }
+    .cw-user     { background: rgba(34,197,94,0.15);  border-color: var(--cw-user); }
+    .cw-assistant{ background: rgba(234,179,8,0.15);  border-color: var(--cw-assistant); }
+    .cw-tool     { background: rgba(249,115,22,0.15); border-color: var(--cw-tool-resp); }
+    .cw-toolcall { background: rgba(244,63,94,0.15);  border-color: var(--cw-tool-call); }
+
+    .cw-label {
+      font-size: 0.65em;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: block;
+    }
+    .cw-label.system   { color: var(--cw-system); }
+    .cw-label.user     { color: var(--cw-user); }
+    .cw-label.assistant{ color: var(--cw-assistant); }
+    .cw-label.tool     { color: var(--cw-tool-resp); }
+    .cw-label.toolcall { color: var(--cw-tool-call); }
+
+    /* Token meter */
+    .token-meter {
+      background: var(--cw-surface);
+      border: 1px solid var(--cw-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 16px 0;
+    }
+    .token-bar {
+      height: 12px;
+      border-radius: 6px;
+      background: var(--cw-border);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .token-fill {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.8s ease;
+    }
+
+    /* Era badges */
+    .era-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.7em;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .era-prompt  { background: rgba(99,102,241,0.25); color: var(--cw-system); border: 1px solid var(--cw-system); }
+    .era-context { background: rgba(34,197,94,0.25);  color: var(--cw-user); border: 1px solid var(--cw-user); }
+    .era-harness { background: rgba(234,179,8,0.25);  color: var(--cw-assistant); border: 1px solid var(--cw-assistant); }
+
+    /* Timeline */
+    .timeline {
+      position: relative;
+      padding-left: 30px;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 8px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--cw-system), var(--cw-user), var(--cw-assistant));
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 14px;
+      font-size: 0.7em;
+    }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -26px;
+      top: 6px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid;
+    }
+    .timeline-item.era1::before { border-color: var(--cw-system); background: rgba(99,102,241,0.4); }
+    .timeline-item.era2::before { border-color: var(--cw-user); background: rgba(34,197,94,0.4); }
+    .timeline-item.era3::before { border-color: var(--cw-assistant); background: rgba(234,179,8,0.4); }
+
+    /* Quote */
+    .quote-block {
+      border-left: 3px solid var(--cw-assistant);
+      padding: 12px 20px;
+      margin: 16px 0;
+      background: rgba(234,179,8,0.08);
+      border-radius: 0 8px 8px 0;
+      font-style: italic;
+    }
+    .quote-attr {
+      font-size: 0.7em;
+      color: var(--cw-muted);
+      font-style: normal;
+      margin-top: 8px;
+    }
+
+    /* Harness diagram */
+    .harness-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .harness-cell {
+      background: var(--cw-surface);
+      border: 1px solid var(--cw-border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.65em;
+    }
+    .harness-cell h4 {
+      margin: 0 0 6px 0;
+      font-size: 1em;
+      color: var(--cw-assistant);
+    }
+    .harness-cell ul {
+      margin: 0;
+      padding-left: 16px;
+    }
+
+    /* Two-column */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* Comparison table */
+    .era-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.7em;
+      margin: 16px 0;
+    }
+    .era-table th, .era-table td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--cw-border);
+    }
+    .era-table th {
+      color: var(--cw-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.85em;
+      letter-spacing: 0.05em;
+    }
+
+    /* Takeaway cards */
+    .takeaway {
+      background: var(--cw-surface);
+      border: 1px solid var(--cw-border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 10px 0;
+    }
+    .takeaway-num {
+      font-size: 2em;
+      font-weight: 800;
+      opacity: 0.2;
+      float: left;
+      margin-right: 16px;
+      line-height: 1;
+    }
+
+    /* Section divider */
+    .section-divider {
+      text-align: center !important;
+    }
+    .section-divider h2 {
+      font-size: 2em;
+    }
+    .section-num {
+      font-size: 5em;
+      font-weight: 800;
+      opacity: 0.15;
+      line-height: 1;
+      margin-bottom: -20px;
+    }
+
+    /* Demo indicator */
+    .demo-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 0.65em;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: rgba(244,63,94,0.2);
+      color: var(--cw-tool-call);
+      border: 1px solid var(--cw-tool-call);
+    }
+
+    /* Agenda item */
+    .agenda-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--cw-border);
+      font-size: 0.8em;
+    }
+    .agenda-time {
+      color: var(--cw-muted);
+      font-family: monospace;
+      min-width: 60px;
+      font-size: 0.85em;
+    }
+    .agenda-title { font-weight: 600; color: #fff; }
+
+    /* Stack viz (mini context window) */
+    .mini-stack {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--cw-border);
+    }
+    .mini-block {
+      padding: 6px 12px;
+      font-size: 0.6em;
+      font-family: monospace;
+    }
+
+    .reveal .slide-number {
+      color: var(--cw-muted);
+      font-family: monospace;
+      font-size: 0.7em;
+    }
+
+    /* Override reveal defaults */
+    .reveal section img {
+      border: none;
+      box-shadow: none;
+    }
+
+    .reveal code {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    .highlight-box {
+      background: var(--cw-surface);
+      border: 1px solid var(--cw-border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 12px 0;
+    }
+  </style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ============================================================ -->
+<!-- TITLE SLIDE                                                    -->
+<!-- ============================================================ -->
+<section>
+  <div style="text-align: center; padding-top: 40px;">
+    <p class="small" style="margin-bottom: 8px;">Trip.com Engineering · Tech Sharing · 2026</p>
+    <h1 style="font-size: 2.4em; line-height: 1.2;">
+      From <span style="color: var(--cw-system);">Prompt</span> Engineering<br>
+      to <span style="color: var(--cw-assistant);">Harness</span> Engineering
+    </h1>
+    <p style="color: var(--cw-muted); font-size: 0.9em; margin-top: 20px;">
+      LLM 应用开发的三个时代<br>
+      <span style="font-size: 0.8em;">The Three Eras of Building with AI</span>
+    </p>
+    <div style="margin-top: 40px;">
+      <p style="font-size: 0.75em; color: var(--cw-muted);">
+        DChar (Dexin Qi) · <span style="font-family: monospace;">dexin.qi@trip.com</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- OPENING HOOK                                                   -->
+<!-- ============================================================ -->
+<section>
+  <h3 style="color: var(--cw-muted);">A question for everyone</h3>
+  <h2 style="font-size: 1.8em; margin-top: 20px;">
+    You write a prompt.<br>
+    The model answers wrong.<br>
+    <span class="fragment" style="color: var(--cw-assistant);">What do you do next?</span>
+  </h2>
+  <div class="fragment" style="margin-top: 40px;">
+    <div style="display: flex; gap: 16px;">
+      <div class="highlight-box" style="flex: 1; text-align: center;">
+        <span style="font-size: 1.5em;">2023</span><br>
+        <span class="small">Rewrite the prompt</span>
+      </div>
+      <div class="highlight-box" style="flex: 1; text-align: center;">
+        <span style="font-size: 1.5em;">2024</span><br>
+        <span class="small">Add more context</span>
+      </div>
+      <div class="highlight-box" style="flex: 1; text-align: center; border-color: var(--cw-assistant);">
+        <span style="font-size: 1.5em;">2026</span><br>
+        <span class="small">Engineer the environment</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h3 style="color: var(--cw-muted);">The evolution of our job</h3>
+  <div class="quote-block">
+    <p>"The human role didn't diminish — it elevated.<br>
+    From wordsmithing prompts, to architecting pipelines, to engineering entire agent operating environments."</p>
+  </div>
+  <div style="margin-top: 30px;">
+    <table class="era-table">
+      <thead>
+        <tr>
+          <th>Era</th>
+          <th>Period</th>
+          <th>Core Question</th>
+          <th>Engineer's Job</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="era-badge era-prompt">Prompt</span></td>
+          <td>2019–2022</td>
+          <td>"How do I <em>ask</em> the model?"</td>
+          <td>Craft the perfect prompt</td>
+        </tr>
+        <tr>
+          <td><span class="era-badge era-context">Context</span></td>
+          <td>2023–2024</td>
+          <td>"What do I <em>give</em> the model?"</td>
+          <td>Orchestrate RAG, tools, agents</td>
+        </tr>
+        <tr>
+          <td><span class="era-badge era-harness">Harness</span></td>
+          <td>2025–2026</td>
+          <td>"What <em>world</em> does the model operate in?"</td>
+          <td>Build environment &amp; feedback loops</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- AGENDA                                                         -->
+<!-- ============================================================ -->
+<section>
+  <h2>Today's Agenda</h2>
+  <p class="small" style="margin-bottom: 20px;">1 hour · 3 live demos · 1 unified visual language</p>
+
+  <div class="agenda-item">
+    <span class="agenda-time">0:00</span>
+    <span class="agenda-title">Opening — The Three Eras</span>
+    <span class="small" style="margin-left: auto;">5 min</span>
+  </div>
+  <div class="agenda-item">
+    <span class="agenda-time">0:05</span>
+    <span class="agenda-title">Timeline — GPT-2 to Harness Engineering</span>
+    <span class="small" style="margin-left: auto;">10 min</span>
+  </div>
+  <div class="agenda-item" style="border-color: var(--cw-system);">
+    <span class="agenda-time">0:15</span>
+    <span class="agenda-title"><span class="demo-badge">Demo 1</span>&nbsp; Context Window Visualizer — Simple</span>
+    <span class="small" style="margin-left: auto;">10 min</span>
+  </div>
+  <div class="agenda-item" style="border-color: var(--cw-user);">
+    <span class="agenda-time">0:25</span>
+    <span class="agenda-title"><span class="demo-badge">Demo 2</span>&nbsp; ReAct Agent — Tool Calling</span>
+    <span class="small" style="margin-left: auto;">12 min</span>
+  </div>
+  <div class="agenda-item" style="border-color: var(--cw-assistant);">
+    <span class="agenda-time">0:37</span>
+    <span class="agenda-title"><span class="demo-badge">Demo 3</span>&nbsp; Full Agent Harness — The Whole Stack</span>
+    <span class="small" style="margin-left: auto;">13 min</span>
+  </div>
+  <div class="agenda-item">
+    <span class="agenda-time">0:50</span>
+    <span class="agenda-title">Key Takeaways for Engineers</span>
+    <span class="small" style="margin-left: auto;">5 min</span>
+  </div>
+  <div class="agenda-item">
+    <span class="agenda-time">0:55</span>
+    <span class="agenda-title">Q&amp;A</span>
+    <span class="small" style="margin-left: auto;">5 min</span>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TIMELINE                                                       -->
+<!-- ============================================================ -->
+<section class="section-divider">
+  <p class="section-num">01</p>
+  <h2>Timeline</h2>
+  <p style="color: var(--cw-muted);">From GPT-2 to Harness Engineering<br>7 years in 10 minutes</p>
+</section>
+
+<section>
+  <h3>Era 1 · <span style="color: var(--cw-system);">Prompt Engineering</span> · 2019–2022</h3>
+  <p class="small">Learning to talk to models. Humans craft input; model generates output.</p>
+
+  <div class="timeline">
+    <div class="timeline-item era1">
+      <strong>Feb 2019</strong> — GPT-2 (1.5B) released. "Too dangerous to release." Scaling era begins.
+    </div>
+    <div class="timeline-item era1">
+      <strong>May 2020</strong> — GPT-3 (175B). Few-shot prompting works. "Prompt engineering" is born.
+    </div>
+    <div class="timeline-item era1">
+      <strong>Jan 2022</strong> — Chain-of-Thought paper. "Let's think step by step" changes everything.
+    </div>
+    <div class="timeline-item era1">
+      <strong>Mar 2022</strong> — InstructGPT / RLHF. Models that <em>follow instructions</em>.
+    </div>
+    <div class="timeline-item era1">
+      <strong>Nov 2022</strong> — ChatGPT launches. 100M users in 2 months. The "iPhone moment."
+    </div>
+  </div>
+
+  <div class="quote-block fragment" style="margin-top: 16px;">
+    <p>"For the first time, you could get a model to do tasks without fine-tuning — just by writing better prompts."</p>
+  </div>
+</section>
+
+<section>
+  <h3>Era 2 · <span style="color: var(--cw-user);">Context Engineering</span> · 2023–2024</h3>
+  <p class="small">Giving models superpowers. RAG, tools, plugins, agents.</p>
+
+  <div class="two-col">
+    <div class="timeline">
+      <div class="timeline-item era2">
+        <strong>Mar 2023</strong> — GPT-4 released. Tool use becomes viable.
+      </div>
+      <div class="timeline-item era2">
+        <strong>Mar 2023</strong> — ChatGPT Plugins + AutoGPT. Agent era begins.
+      </div>
+      <div class="timeline-item era2">
+        <strong>Jun 2023</strong> — OpenAI Function Calling. Standardized tool use.
+      </div>
+      <div class="timeline-item era2">
+        <strong>Nov 2023</strong> — GPT-4 Turbo: 128K context window (16× increase).
+      </div>
+      <div class="timeline-item era2">
+        <strong>Early 2024</strong> — RAG goes mainstream. Vector DBs everywhere.
+      </div>
+      <div class="timeline-item era2">
+        <strong>2024</strong> — Dify, Coze: no-code AI platforms.
+      </div>
+    </div>
+    <div>
+      <div class="quote-block" style="margin-top: 0;">
+        <p>"+1 for 'context engineering' over 'prompt engineering'. Context engineering is the delicate art and science of filling the context window with just the right information for the next step."</p>
+        <div class="quote-attr">— Andrej Karpathy, June 2025</div>
+      </div>
+      <p class="small fragment" style="margin-top: 16px;">
+        <strong>Key insight:</strong> The prompt is a small part. What matters is <em>everything</em> in the context window — retrieved docs, tool outputs, history, system instructions.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h3>Era 3 · <span style="color: var(--cw-assistant);">Harness Engineering</span> · 2025–2026</h3>
+  <p class="small">Engineering the environment, not the prompt. Models reason; humans build the world.</p>
+
+  <div class="two-col">
+    <div class="timeline">
+      <div class="timeline-item era3">
+        <strong>Sep 2024</strong> — OpenAI o1: reasoning models internalize CoT.
+      </div>
+      <div class="timeline-item era3">
+        <strong>Oct 2024</strong> — Claude Computer Use. Models operate full desktops.
+      </div>
+      <div class="timeline-item era3">
+        <strong>Nov 2024</strong> — Anthropic MCP. "USB-C for AI."
+      </div>
+      <div class="timeline-item era3">
+        <strong>Jan 2025</strong> — DeepSeek-R1. Open-source reasoning.
+      </div>
+      <div class="timeline-item era3">
+        <strong>Feb 2025</strong> — Claude Code. Terminal as harness.
+      </div>
+      <div class="timeline-item era3" style="font-weight: 600;">
+        <strong>Feb 5, 2026</strong> — Mitchell Hashimoto coins "Harness Engineering."
+      </div>
+      <div class="timeline-item era3">
+        <strong>Feb 11, 2026</strong> — OpenAI adopts the term. 0 hand-written code, 1M lines.
+      </div>
+    </div>
+    <div>
+      <div class="quote-block" style="margin-top: 0;">
+        <p>"Anytime you find an agent makes a mistake, you take the time to engineer a solution such that the agent never makes that mistake again."</p>
+        <div class="quote-attr">— Mitchell Hashimoto, Feb 2026</div>
+      </div>
+      <p class="small fragment" style="margin-top: 16px;">
+        <strong>The shift:</strong> From "telling the model what to think" → "building the world the model operates in."
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TRANSITION: What does this look like inside the model?         -->
+<!-- ============================================================ -->
+<section>
+  <div style="text-align: center;">
+    <h2>One concept unifies all three eras</h2>
+    <h1 style="color: var(--cw-assistant); font-size: 2.4em; margin-top: 20px;">
+      The Context Window
+    </h1>
+    <p style="color: var(--cw-muted); margin-top: 20px; font-size: 0.9em;">
+      Every interaction with an LLM = filling a fixed-size memory buffer.<br>
+      Let's see what's inside.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DEMO 1: CONTEXT WINDOW VISUALIZER — SIMPLE                    -->
+<!-- ============================================================ -->
+<section class="section-divider">
+  <p class="section-num">02</p>
+  <h2>Demo 1: Simple Conversation</h2>
+  <p><span class="era-badge era-prompt">Prompt Engineering Era</span></p>
+  <p style="color: var(--cw-muted); font-size: 0.85em;">What happens inside the context window<br>during a basic chat interaction?</p>
+</section>
+
+<section>
+  <h3>Context Window — Simple Mode</h3>
+  <p class="small">A basic chat: system prompt + user message + assistant response</p>
+
+  <div class="two-col">
+    <div>
+      <div class="mini-stack">
+        <div class="mini-block" style="background: rgba(99,102,241,0.25); color: var(--cw-system);">
+          <span class="cw-label system">system</span>
+          You are a helpful travel assistant.
+        </div>
+        <div class="mini-block" style="background: rgba(34,197,94,0.15); color: var(--cw-user);">
+          <span class="cw-label user">user</span>
+          What's the best time to visit Tokyo?
+        </div>
+        <div class="mini-block" style="background: rgba(234,179,8,0.15); color: var(--cw-assistant);">
+          <span class="cw-label assistant">assistant</span>
+          The best time to visit Tokyo is during spring (March–May) for cherry blossoms or autumn (Oct–Nov) for foliage...
+        </div>
+      </div>
+
+      <div class="token-meter" style="margin-top: 16px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span class="small">Token usage</span>
+          <span class="small" style="font-family: monospace;">187 / 128,000</span>
+        </div>
+        <div class="token-bar">
+          <div class="token-fill" style="width: 0.15%; background: var(--cw-system);"></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p style="font-size: 0.8em; font-weight: 600;">Key observations:</p>
+      <ul style="font-size: 0.75em;">
+        <li>The entire conversation fits in one context window</li>
+        <li>System prompt sets the <em>persona</em></li>
+        <li>Almost no tokens used — vast empty space</li>
+        <li>This is all prompt engineering needs</li>
+      </ul>
+      <div class="highlight-box fragment" style="margin-top: 16px;">
+        <p style="font-size: 0.75em; margin: 0;">
+          <strong>Q: Direct prompt vs Chain-of-Thought?</strong><br>
+          CoT = physically longer context → more "thinking space"<br>
+          <span style="color: var(--cw-muted);">→ Let's see this live ↗</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div style="text-align: center;">
+    <p class="demo-badge" style="font-size: 0.85em;">🖥️ Live Demo</p>
+    <h2 style="margin-top: 20px;">Context Window Visualizer</h2>
+    <p style="color: var(--cw-muted);">Simple Mode</p>
+    <div style="margin-top: 30px;">
+      <p class="small">
+        Direct prompt vs CoT prompt — watch the context window fill differently<br>
+        <code style="color: var(--cw-system);">localhost:3000</code> →
+        <code style="color: var(--cw-user);">Mode: Simple</code>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TRANSITION TO DEMO 2                                          -->
+<!-- ============================================================ -->
+<section>
+  <h3 style="color: var(--cw-muted);">From simple prompts to...</h3>
+  <h2>What if the model needs to <em>do</em> things?</h2>
+  <div class="fragment" style="margin-top: 30px;">
+    <p style="font-size: 0.9em;">
+      Search flights ✈️ · Book hotels 🏨 · Find restaurants 🍜<br>
+      <span style="color: var(--cw-muted);">...sounds like a Trip.com engineer's daily life</span>
+    </p>
+    <p style="font-size: 0.85em; margin-top: 20px;">
+      Enter the <span class="era-badge era-context">Context Engineering</span> era →<br>
+      The model gets <strong>tools</strong>. Watch what happens to the context window.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DEMO 2: REACT AGENT — TOOL CALLING                            -->
+<!-- ============================================================ -->
+<section class="section-divider">
+  <p class="section-num">03</p>
+  <h2>Demo 2: ReAct Agent</h2>
+  <p><span class="era-badge era-context">Context Engineering Era</span></p>
+  <p style="color: var(--cw-muted); font-size: 0.85em;">A travel planning agent with real tools<br>Thought → Action → Observation loops</p>
+</section>
+
+<section>
+  <h3>ReAct Pattern: Think → Act → Observe</h3>
+  <p class="small">Scenario: "Plan a 3-day Tokyo trip from Shanghai. Budget ¥15,000/day."</p>
+
+  <div class="two-col">
+    <div>
+      <div class="mini-stack">
+        <div class="mini-block" style="background: rgba(99,102,241,0.25); color: var(--cw-system); padding: 4px 12px;">
+          <span class="cw-label system">system</span>
+          You are a travel planning agent with access to: search_flights, search_hotels, search_restaurants...
+        </div>
+        <div class="mini-block" style="background: rgba(34,197,94,0.15); color: var(--cw-user); padding: 4px 12px;">
+          <span class="cw-label user">user</span>
+          Plan a 3-day Tokyo trip. Budget ¥15,000/day.
+        </div>
+        <div class="mini-block" style="background: rgba(234,179,8,0.15); color: var(--cw-assistant); padding: 4px 12px;">
+          <span class="cw-label assistant">💭 thought</span>
+          Let me search flights first...
+        </div>
+        <div class="mini-block" style="background: rgba(244,63,94,0.15); color: var(--cw-tool-call); padding: 4px 12px;">
+          <span class="cw-label toolcall">tool_call</span>
+          search_flights(origin="PVG", dest="NRT")
+        </div>
+        <div class="mini-block" style="background: rgba(249,115,22,0.15); color: var(--cw-tool-resp); padding: 4px 12px;">
+          <span class="cw-label tool">tool response</span>
+          Found: MU523 ¥2,890 / CA921 ¥3,200 / ...
+        </div>
+        <div class="mini-block" style="background: rgba(234,179,8,0.15); color: var(--cw-assistant); padding: 4px 12px;">
+          <span class="cw-label assistant">💭 thought</span>
+          MU523 looks good. Now hotels near Shinjuku...
+        </div>
+        <div class="mini-block" style="background: rgba(244,63,94,0.1); color: var(--cw-tool-call); padding: 4px 12px; opacity: 0.7;">
+          <span class="cw-label toolcall">...</span>
+          Round 2, 3, 4...
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="token-meter">
+        <div style="display: flex; justify-content: space-between;">
+          <span class="small">Context growing with each tool call</span>
+          <span class="small" style="font-family: monospace;">~4,200 / 128K</span>
+        </div>
+        <div class="token-bar">
+          <div class="token-fill" style="width: 3.3%; background: linear-gradient(to right, var(--cw-system), var(--cw-tool-resp));"></div>
+        </div>
+      </div>
+      <p style="font-size: 0.8em; margin-top: 16px;"><strong>Key observations:</strong></p>
+      <ul style="font-size: 0.7em;">
+        <li>Each tool round-trip <strong>adds tokens</strong> to context</li>
+        <li>The model "remembers" by re-reading everything</li>
+        <li>After 3-4 rounds, context = mostly tool responses</li>
+        <li>Observation data often 10× larger than thoughts</li>
+        <li class="fragment" style="color: var(--cw-assistant);">⚠️ Long agent loops can <em>fill</em> the context window</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div style="text-align: center;">
+    <p class="demo-badge" style="font-size: 0.85em;">🖥️ Live Demo</p>
+    <h2 style="margin-top: 20px;">ReAct Agent + Visualizer</h2>
+    <p style="color: var(--cw-muted);">Tool Calling Mode</p>
+    <div style="margin-top: 30px;">
+      <p class="small">
+        Watch the context window grow with each Thought→Action→Observation cycle<br>
+        <code style="color: var(--cw-system);">localhost:3000</code> →
+        <code style="color: var(--cw-user);">Mode: Tool Calling</code>
+      </p>
+      <p class="small" style="margin-top: 16px; color: var(--cw-muted);">
+        Travel scenario: Shanghai → Tokyo, flights + hotel + restaurants<br>
+        Powered by Dify workflow with custom Trip.com-style tools
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TRANSITION TO DEMO 3                                          -->
+<!-- ============================================================ -->
+<section>
+  <h3 style="color: var(--cw-muted);">Tool calling agents work, but...</h3>
+  <h2>What happens at <span style="color: var(--cw-assistant);">production scale</span>?</h2>
+  <div class="fragment" style="margin-top: 20px;">
+    <ul style="font-size: 0.85em;">
+      <li>Agents need <strong>persistent memory</strong> across sessions</li>
+      <li>Agents need <strong>identity, skills, rules</strong></li>
+      <li>Agents need <strong>guardrails</strong> — not just tools</li>
+      <li>One big prompt → one big failure mode</li>
+    </ul>
+  </div>
+  <div class="fragment quote-block" style="margin-top: 24px;">
+    <p>"The model is already smart. The harness gives it hands, eyes, and a workspace."</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DEMO 3: FULL AGENT HARNESS                                    -->
+<!-- ============================================================ -->
+<section class="section-divider">
+  <p class="section-num">04</p>
+  <h2>Demo 3: Full Agent Harness</h2>
+  <p><span class="era-badge era-harness">Harness Engineering Era</span></p>
+  <p style="color: var(--cw-muted); font-size: 0.85em;">A real production agent's context window<br>revealed in all its complexity</p>
+</section>
+
+<section>
+  <h3>What a Production Harness Injects</h3>
+  <p class="small">Before the user even speaks, the context window is already rich</p>
+
+  <div class="two-col">
+    <div>
+      <div class="mini-stack">
+        <div class="mini-block" style="background: rgba(99,102,241,0.3); color: var(--cw-system); font-size: 0.55em; padding: 3px 12px;">
+          <span class="cw-label system" style="font-size: 0.6em;">system — core instructions</span>
+          You are Claude Code, Anthropic's CLI agent...
+        </div>
+        <div class="mini-block" style="background: rgba(99,102,241,0.2); color: var(--cw-system); font-size: 0.55em; padding: 3px 12px;">
+          <span class="cw-label system" style="font-size: 0.6em;">system — AGENTS.md</span>
+          Read SOUL.md, USER.md, memory/active.md...
+        </div>
+        <div class="mini-block" style="background: rgba(99,102,241,0.2); color: var(--cw-system); font-size: 0.55em; padding: 3px 12px;">
+          <span class="cw-label system" style="font-size: 0.6em;">system — SOUL.md (identity)</span>
+          Be genuinely helpful. Have opinions. Be resourceful...
+        </div>
+        <div class="mini-block" style="background: rgba(99,102,241,0.2); color: var(--cw-system); font-size: 0.55em; padding: 3px 12px;">
+          <span class="cw-label system" style="font-size: 0.6em;">system — USER.md</span>
+          DChar, GMT+8, CTO @ VationX...
+        </div>
+        <div class="mini-block" style="background: rgba(99,102,241,0.15); color: var(--cw-system); font-size: 0.55em; padding: 3px 12px;">
+          <span class="cw-label system" style="font-size: 0.6em;">system — 40+ skill definitions</span>
+          github, slack, weather, browser, email...
+        </div>
+        <div class="mini-block" style="background: rgba(99,102,241,0.1); color: var(--cw-system); font-size: 0.55em; padding: 3px 12px;">
+          <span class="cw-label system" style="font-size: 0.6em;">system — tool schemas</span>
+          read(), write(), exec(), web_search()...
+        </div>
+        <div class="mini-block" style="background: rgba(99,102,241,0.1); color: var(--cw-system); font-size: 0.55em; padding: 3px 12px;">
+          <span class="cw-label system" style="font-size: 0.6em;">system — memory/active.md</span>
+          Current tasks, project status, daily log...
+        </div>
+        <div class="mini-block" style="background: rgba(34,197,94,0.15); color: var(--cw-user); font-size: 0.55em; padding: 3px 12px;">
+          <span class="cw-label user" style="font-size: 0.6em;">user</span>
+          "Hey, check the weather in Tokyo"
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="token-meter">
+        <div style="display: flex; justify-content: space-between;">
+          <span class="small">Before user speaks</span>
+          <span class="small" style="font-family: monospace; color: var(--cw-tool-call);">~18,000 / 200K</span>
+        </div>
+        <div class="token-bar">
+          <div class="token-fill" style="width: 9%; background: var(--cw-system);"></div>
+        </div>
+      </div>
+      <p style="font-size: 0.75em; margin-top: 16px; font-weight: 600;">The "iceberg" effect:</p>
+      <ul style="font-size: 0.7em;">
+        <li>User sees: <span style="color: var(--cw-user);">"check the weather"</span> (6 tokens)</li>
+        <li>Model sees: <span style="color: var(--cw-system);">18,000 tokens</span> of context</li>
+        <li>System prompt alone = ~15,000 tokens</li>
+        <li>Identity, memory, skills, tools, rules...</li>
+      </ul>
+      <div class="highlight-box fragment" style="margin-top: 16px;">
+        <p style="font-size: 0.7em; margin: 0;">
+          <strong style="color: var(--cw-assistant);">This is harness engineering.</strong><br>
+          The harness fills 90% of the context window <em>before</em> the user speaks.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h3>The Harness Architecture</h3>
+  <div class="harness-grid">
+    <div class="harness-cell">
+      <h4>📝 Context Engineering</h4>
+      <ul>
+        <li>AGENTS.md (map, not manual)</li>
+        <li>Progressive disclosure</li>
+        <li>RAG / search</li>
+        <li>Memory files</li>
+      </ul>
+    </div>
+    <div class="harness-cell">
+      <h4>🔧 Tools & Execution</h4>
+      <ul>
+        <li>File read/write</li>
+        <li>Shell/CLI execution</li>
+        <li>Browser automation</li>
+        <li>MCP protocol</li>
+      </ul>
+    </div>
+    <div class="harness-cell">
+      <h4>🧠 Memory & State</h4>
+      <ul>
+        <li>Progress files</li>
+        <li>Git log as memory</li>
+        <li>Feature checklists (JSON)</li>
+        <li>Cross-session handoff</li>
+      </ul>
+    </div>
+    <div class="harness-cell">
+      <h4>🛡️ Guardrails</h4>
+      <ul>
+        <li>Custom linters</li>
+        <li>Architectural tests</li>
+        <li>Permission model</li>
+        <li>Sandboxing</li>
+      </ul>
+    </div>
+    <div class="harness-cell">
+      <h4>📊 Observability</h4>
+      <ul>
+        <li>Logs, metrics, traces</li>
+        <li>Screenshots</li>
+        <li>CI/CD results</li>
+        <li>Agent feedback loops</li>
+      </ul>
+    </div>
+    <div class="harness-cell">
+      <h4>🔄 Orchestration</h4>
+      <ul>
+        <li>Session management</li>
+        <li>Context compaction</li>
+        <li>Multi-agent coordination</li>
+        <li>Lifecycle hooks</li>
+      </ul>
+    </div>
+  </div>
+  <div class="quote-block fragment">
+    <p>"Humans steer. Agents execute."</p>
+    <div class="quote-attr">— OpenAI, "Harness Engineering: Leveraging Codex"</div>
+  </div>
+</section>
+
+<section>
+  <h3>Real Example: OpenAI's Codex Harness</h3>
+  <div class="two-col">
+    <div>
+      <div class="highlight-box">
+        <p style="font-size: 1.5em; font-weight: 800; margin: 0; color: var(--cw-assistant);">0</p>
+        <p style="font-size: 0.7em; margin: 4px 0 0;">lines of hand-written code</p>
+      </div>
+      <div class="highlight-box">
+        <p style="font-size: 1.5em; font-weight: 800; margin: 0; color: var(--cw-user);">1,000,000+</p>
+        <p style="font-size: 0.7em; margin: 4px 0 0;">lines generated by agents</p>
+      </div>
+      <div class="highlight-box">
+        <p style="font-size: 1.5em; font-weight: 800; margin: 0; color: var(--cw-system);">1,500</p>
+        <p style="font-size: 0.7em; margin: 4px 0 0;">PRs merged · 3 engineers · 5 months</p>
+      </div>
+    </div>
+    <div>
+      <p style="font-size: 0.8em; font-weight: 600;">How?</p>
+      <ul style="font-size: 0.7em;">
+        <li><strong>AGENTS.md as table of contents</strong> (~100 lines) — not a 1,000-page manual</li>
+        <li><strong>Linter error messages = teaching</strong> — violations include fix instructions</li>
+        <li><strong>Architecture enforced mechanically</strong> — not by humans reviewing PRs</li>
+        <li><strong>"What Codex can't see doesn't exist"</strong> — all knowledge in the repo</li>
+        <li><strong>Doc gardening agents</strong> — background agents fight entropy</li>
+      </ul>
+      <div class="quote-block fragment" style="margin-top: 12px;">
+        <p style="font-size: 0.85em;">"Give Codex a map, not a 1,000-page instruction manual."</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div style="text-align: center;">
+    <p class="demo-badge" style="font-size: 0.85em;">🖥️ Live Demo</p>
+    <h2 style="margin-top: 20px;">Full Harness Visualizer</h2>
+    <p style="color: var(--cw-muted);">Harness Mode</p>
+    <div style="margin-top: 30px;">
+      <p class="small">
+        See a real agent's context window expand — system prompt, skills, tools, memory<br>
+        <code style="color: var(--cw-system);">localhost:3000</code> →
+        <code style="color: var(--cw-user);">Mode: Harness</code>
+      </p>
+      <p class="small" style="margin-top: 16px; color: var(--cw-muted);">
+        Watch the "iceberg" — most of the context is invisible to the user<br>
+        Expandable system prompt reveals SOUL.md, USER.md, skill definitions, tools
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- KEY TAKEAWAYS                                                  -->
+<!-- ============================================================ -->
+<section class="section-divider">
+  <p class="section-num">05</p>
+  <h2>Key Takeaways</h2>
+  <p style="color: var(--cw-muted);">For Trip.com engineers</p>
+</section>
+
+<section>
+  <h3>Five Things to Take Away</h3>
+
+  <div class="takeaway">
+    <span class="takeaway-num" style="color: var(--cw-system);">1</span>
+    <p style="font-size: 0.8em; margin: 0;">
+      <strong>The context window is the fundamental abstraction.</strong><br>
+      <span style="color: var(--cw-muted);">Every LLM interaction = filling a memory buffer. Understanding this explains everything — from prompt engineering to RAG to agent harnesses.</span>
+    </p>
+  </div>
+
+  <div class="takeaway fragment">
+    <span class="takeaway-num" style="color: var(--cw-user);">2</span>
+    <p style="font-size: 0.8em; margin: 0;">
+      <strong>Tools make agents useful. Guardrails make agents reliable.</strong><br>
+      <span style="color: var(--cw-muted);">Function calling and RAG were table-stakes in 2024. The hard part is building the environment where agents don't break things.</span>
+    </p>
+  </div>
+
+  <div class="takeaway fragment">
+    <span class="takeaway-num" style="color: var(--cw-assistant);">3</span>
+    <p style="font-size: 0.8em; margin: 0;">
+      <strong>Harness engineering is the new "DevOps for AI."</strong><br>
+      <span style="color: var(--cw-muted);">AGENTS.md, linters, progressive disclosure, doc gardening — these are infrastructure patterns, not prompt tricks.</span>
+    </p>
+  </div>
+
+  <div class="takeaway fragment">
+    <span class="takeaway-num" style="color: var(--cw-tool-call);">4</span>
+    <p style="font-size: 0.8em; margin: 0;">
+      <strong>The human role elevated, not diminished.</strong><br>
+      <span style="color: var(--cw-muted);">From prompt-crafting (2023) to context-orchestrating (2024) to harness-engineering (2026). Each step requires more engineering skill, not less.</span>
+    </p>
+  </div>
+
+  <div class="takeaway fragment">
+    <span class="takeaway-num" style="color: var(--cw-tool-resp);">5</span>
+    <p style="font-size: 0.8em; margin: 0;">
+      <strong>Start building harnesses now — at Trip.com scale, it matters.</strong><br>
+      <span style="color: var(--cw-muted);">Travel domain = perfect testbed: structured data, real tools, multi-step workflows. Your booking APIs are ready-made agent tools.</span>
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PRACTICAL NEXT STEPS                                           -->
+<!-- ============================================================ -->
+<section>
+  <h3>Practical Next Steps</h3>
+  <p class="small">Things you can try this week</p>
+
+  <div class="two-col">
+    <div>
+      <div class="highlight-box">
+        <p style="font-size: 0.8em; font-weight: 600; margin: 0 0 8px;">🔰 Getting started</p>
+        <ul style="font-size: 0.7em; margin: 0;">
+          <li>Try Claude Code or Codex on a small PR</li>
+          <li>Write an AGENTS.md for your repo</li>
+          <li>Add "Let's think step by step" to your prompts (seriously, it works)</li>
+          <li>Explore Dify for workflow prototyping</li>
+        </ul>
+      </div>
+      <div class="highlight-box">
+        <p style="font-size: 0.8em; font-weight: 600; margin: 0 0 8px;">⚡ Intermediate</p>
+        <ul style="font-size: 0.7em; margin: 0;">
+          <li>Wrap your team's APIs as MCP tools</li>
+          <li>Build a RAG pipeline for your docs</li>
+          <li>Set up linters that teach (error msgs = instructions)</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="highlight-box">
+        <p style="font-size: 0.8em; font-weight: 600; margin: 0 0 8px;">🚀 Advanced</p>
+        <ul style="font-size: 0.7em; margin: 0;">
+          <li>Full harness for your team's agent workflow</li>
+          <li>Progressive disclosure architecture for context</li>
+          <li>Multi-session agent with state persistence</li>
+          <li>"Doc gardening" agents for your wiki/docs</li>
+        </ul>
+      </div>
+      <div class="highlight-box">
+        <p style="font-size: 0.8em; font-weight: 600; margin: 0 0 8px;">📖 Reading list</p>
+        <ul style="font-size: 0.65em; margin: 0;">
+          <li>Hashimoto: mitchellh.com/writing/my-ai-adoption-journey</li>
+          <li>OpenAI: openai.com/index/harness-engineering</li>
+          <li>Anthropic: anthropic.com/engineering/effective-harnesses</li>
+          <li>Fowler: martinfowler.com/.../harness-engineering</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- CLOSING                                                        -->
+<!-- ============================================================ -->
+<section>
+  <div style="text-align: center; padding-top: 30px;">
+    <h2 style="font-size: 1.6em; line-height: 1.4;">
+      <span style="color: var(--cw-system);">Prompt Engineering</span> was about what to <em>ask</em>.<br>
+      <span style="color: var(--cw-user);">Context Engineering</span> was about what to <em>send</em>.<br>
+      <span style="color: var(--cw-assistant);">Harness Engineering</span> is about what to <em>build</em>.
+    </h2>
+    <div class="quote-block fragment" style="max-width: 600px; margin: 30px auto;">
+      <p>"Claude Code is not a better model. It's a better harness wrapped around the same model."</p>
+      <div class="quote-attr">— Aakash Gupta</div>
+    </div>
+    <p class="fragment" style="color: var(--cw-muted); margin-top: 30px; font-size: 0.9em;">
+      The model is smart enough.<br>
+      <strong style="color: #fff;">Your job is to build the world it operates in.</strong>
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- Q&A                                                            -->
+<!-- ============================================================ -->
+<section>
+  <div style="text-align: center; padding-top: 60px;">
+    <h1 style="font-size: 3em;">Q&amp;A</h1>
+    <p style="color: var(--cw-muted); font-size: 1em; margin-top: 20px;">
+      Questions, ideas, or war stories?
+    </p>
+    <div style="margin-top: 60px;">
+      <p class="small">
+        Slides &amp; demo code: <code>github.com/...</code><br>
+        Context Window Visualizer: <code>localhost:3000</code> (try it yourself!)
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- APPENDIX: REFERENCES                                           -->
+<!-- ============================================================ -->
+<section>
+  <h3>References &amp; Further Reading</h3>
+  <div class="two-col">
+    <div>
+      <p style="font-size: 0.7em; font-weight: 600;">Primary Sources</p>
+      <ul style="font-size: 0.6em;">
+        <li>Hashimoto — "My AI Adoption Journey" (Feb 5, 2026)</li>
+        <li>OpenAI — "Harness Engineering: Leveraging Codex" (Feb 11, 2026)</li>
+        <li>Anthropic — "Effective Harnesses for Long-Running Agents" (2026)</li>
+        <li>Fowler/Böckeler — "Harness Engineering" (Feb 17, 2026)</li>
+      </ul>
+      <p style="font-size: 0.7em; font-weight: 600; margin-top: 12px;">Timeline Sources</p>
+      <ul style="font-size: 0.6em;">
+        <li>Wei et al. — "Chain-of-Thought Prompting" (Jan 2022)</li>
+        <li>Ouyang et al. — "Training LMs to Follow Instructions" (Mar 2022)</li>
+        <li>Lewis et al. — "Retrieval-Augmented Generation" (May 2020)</li>
+      </ul>
+    </div>
+    <div>
+      <p style="font-size: 0.7em; font-weight: 600;">Analysis &amp; Commentary</p>
+      <ul style="font-size: 0.6em;">
+        <li>Ignorance.ai — "The Emerging Harness Engineering Playbook"</li>
+        <li>LangChain — "The Anatomy of an Agent Harness"</li>
+        <li>Phil Schmid — "The Importance of Agent Harness in 2026"</li>
+        <li>Aakash Gupta — "2025 Was Agents. 2026 Is Agent Harnesses."</li>
+      </ul>
+      <p style="font-size: 0.7em; font-weight: 600; margin-top: 12px;">Tools &amp; Frameworks</p>
+      <ul style="font-size: 0.6em;">
+        <li>Anthropic MCP — Model Context Protocol</li>
+        <li>Google A2A — Agent-to-Agent Protocol</li>
+        <li>Dify — Open-source AI platform</li>
+        <li>Claude Code / OpenAI Codex — Agent harnesses</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    width: 1280,
+    height: 720,
+    margin: 0.08,
+    transition: 'fade',
+    transitionSpeed: 'fast',
+    backgroundTransition: 'fade',
+    plugins: [ RevealHighlight ],
+    // Keyboard shortcuts
+    keyboard: {
+      // 'b' for black screen (built-in)
+    }
+  });
+</script>
+</body>
+</html>
