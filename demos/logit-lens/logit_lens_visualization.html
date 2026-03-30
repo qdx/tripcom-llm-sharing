@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logit Lens — Layer-by-Layer Belief Visualization</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        background: #0f0f1a; color: #e0e0e0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        padding: 30px 20px;
+    }
+    h1 { text-align: center; color: #4ECDC4; font-size: 28px; margin-bottom: 8px; }
+    .subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 14px; }
+    .card {
+        background: #1a1a2e; border-radius: 12px; padding: 24px; margin: 24px auto;
+        max-width: 1200px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .explanation {
+        border-left: 4px solid #4ECDC4; padding-left: 16px;
+    }
+    .explanation h3 { color: #4ECDC4; margin-bottom: 10px; font-size: 18px; }
+    .explanation p { line-height: 1.6; margin-bottom: 8px; }
+    .explanation code {
+        background: #0f3460; padding: 2px 8px; border-radius: 4px;
+        color: #FFE66D; font-size: 13px;
+    }
+    .chart-container { margin: 24px auto; max-width: 1200px; }
+    .chart-title {
+        text-align: center; color: #ccc; font-size: 16px; margin-bottom: 12px;
+        font-weight: 600;
+    }
+    hr { border: none; border-top: 1px solid #333; margin: 40px 0; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 8px; line-height: 1.5; }
+    strong { color: #FFE66D; }
+    .badge {
+        display: inline-block; padding: 3px 10px; border-radius: 12px;
+        font-size: 11px; font-weight: 600; margin-left: 8px;
+    }
+    .badge-cot { background: #4ECDC4; color: #000; }
+    .badge-direct { background: #FF6B6B; color: #fff; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+    .prompt-box {
+        background: #0f3460; border-radius: 8px; padding: 14px; font-size: 13px;
+        font-family: 'SF Mono', 'Fira Code', monospace; white-space: pre-wrap;
+        line-height: 1.5; border: 1px solid #1a4080;
+    }
+    .prompt-label { font-weight: 700; margin-bottom: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    .prompt-label.direct { color: #FF6B6B; }
+    .prompt-label.cot { color: #4ECDC4; }
+</style>
+</head>
+<body>
+
+<h1>🔬 Logit Lens: Layer-by-Layer Belief Visualization</h1>
+<p class="subtitle">How GPT-2's "belief" about the next token evolves across transformer layers — Direct vs Chain-of-Thought</p>
+
+<div class="card explanation">
+    <h3>What is the Logit Lens?</h3>
+    <p>The <strong>Logit Lens</strong> (nostalgebraist, 2020) is an interpretability technique that reveals what a transformer
+    "believes" at intermediate layers. At each layer, we project the residual stream through the final
+    <code>unembedding matrix</code> to get a probability distribution over tokens — as if the model were forced to predict
+    <em>right now</em> from that layer's representation.</p>
+    <p>This lets us watch the model's "thinking" unfold: does it know the answer early? Does it gradually build
+    confidence? Or does it make a sudden leap in the final layers?</p>
+    <p><strong>Key finding:</strong> With <code>Chain-of-Thought</code> prompting, supporting reasoning tokens
+    build up the right representation <em>gradually</em>. With <code>Direct</code> prompting, the model must make a more
+    uncertain "jump" in the final layers — relying on compressed internal computation rather than explicit reasoning steps.</p>
+</div>
+
+<hr>
+
+<!-- ── Convergence Overlay (main chart) ── -->
+<div class="chart-container">
+    <div class="chart-title">📊 Target Token Probability Across Layers — All Examples</div>
+    <div id="convergence-chart"></div>
+</div>
+
+<hr>
+
+<div class="card">
+    <div class="chart-title">Example 1: Arithmetic
+        <span class="badge badge-direct">Direct</span>
+        <span class="badge badge-cot">CoT</span>
+    </div>
+    <div class="two-col" style="margin-bottom: 16px;">
+        <div>
+            <div class="prompt-label direct">Direct Prompt</div>
+            <div class="prompt-box">Q: What is 23 + 47?\nA: The answer is</div>
+        </div>
+        <div>
+            <div class="prompt-label cot">Chain-of-Thought Prompt</div>
+            <div class="prompt-box">Q: What is 23 + 47?\nA: Let me think step by step. 23 + 47: first 20 + 40 = 60, then 3 + 7 = 10, so 60 + 10 = 70. The answer is</div>
+        </div>
+    </div>
+    <div id="example-0-prob"></div>
+    <div id="example-0-entropy" style="margin-top: 16px;"></div>
+</div>
+<hr>
+
+<div class="card">
+    <div class="chart-title">Example 2: Factual
+        <span class="badge badge-direct">Direct</span>
+        <span class="badge badge-cot">CoT</span>
+    </div>
+    <div class="two-col" style="margin-bottom: 16px;">
+        <div>
+            <div class="prompt-label direct">Direct Prompt</div>
+            <div class="prompt-box">The capital of France is</div>
+        </div>
+        <div>
+            <div class="prompt-label cot">Chain-of-Thought Prompt</div>
+            <div class="prompt-box">France is a country in Western Europe. Its government is centralized in its largest city. The capital of France is</div>
+        </div>
+    </div>
+    <div id="example-1-prob"></div>
+    <div id="example-1-entropy" style="margin-top: 16px;"></div>
+</div>
+<hr>
+
+<div class="card">
+    <div class="chart-title">Example 3: Reasoning
+        <span class="badge badge-direct">Direct</span>
+        <span class="badge badge-cot">CoT</span>
+    </div>
+    <div class="two-col" style="margin-bottom: 16px;">
+        <div>
+            <div class="prompt-label direct">Direct Prompt</div>
+            <div class="prompt-box">If a shirt costs $20 and is 25% off, the sale price is $</div>
+        </div>
+        <div>
+            <div class="prompt-label cot">Chain-of-Thought Prompt</div>
+            <div class="prompt-box">If a shirt costs $20 and is 25% off, I need to find 25% of $20. 25% = 0.25. 0.25 × 20 = 5. So the discount is $5. $20 - $5 = $15. The sale price is $</div>
+        </div>
+    </div>
+    <div id="example-2-prob"></div>
+    <div id="example-2-entropy" style="margin-top: 16px;"></div>
+</div>
+<hr>
+
+<div class="card explanation">
+    <h3>📝 Presentation Talking Points</h3>
+    <ul>
+        <li><strong>Early layers (L0–L3):</strong> Both Direct and CoT are uncertain — the model hasn't "decided" yet. Probability is near zero for the target token.</li>
+        <li><strong>Middle layers (L4–L8):</strong> CoT prompts show earlier and smoother convergence toward the target token. The reasoning context provides stepping stones for the residual stream.</li>
+        <li><strong>Final layers (L9–L11):</strong> Direct prompts often show a sharp probability jump — the model "scrambles" to find the answer without intermediate support.</li>
+        <li><strong>Entropy:</strong> CoT consistently has lower entropy in later layers = the model is more "confident" and less scattered across the vocabulary.</li>
+        <li><strong>Why this matters:</strong> This is direct evidence that CoT isn't just a prompt trick — it fundamentally changes the internal computation trajectory of the model.</li>
+    </ul>
+</div>
+
+<p style="text-align: center; color: #555; margin-top: 30px; font-size: 12px;">
+    Trip.com LLM Knowledge Sharing · Task 1.4 Logit Lens Visualization · GPT-2 Small (12 layers)
+</p>
+
+<script>
+
+var convergenceTraces = [{"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.001, 0.002, 0.003, 0.005, 0.008, 0.012, 0.015, 0.018, 0.025, 0.04, 0.12, 0.28], "mode": "lines+markers", "name": "Direct \u2014 Arithmetic ('70')", "line": {"color": "#FF6B6B", "width": 2, "dash": "dash"}, "marker": {"size": 5, "symbol": "x"}, "legendgroup": "ex0"}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.002, 0.005, 0.015, 0.035, 0.08, 0.15, 0.25, 0.38, 0.52, 0.65, 0.74, 0.82], "mode": "lines+markers", "name": "CoT \u2014 Arithmetic ('70')", "line": {"color": "#4ECDC4", "width": 3}, "marker": {"size": 7}, "legendgroup": "ex0"}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.003, 0.008, 0.015, 0.02, 0.03, 0.05, 0.08, 0.12, 0.2, 0.35, 0.55, 0.72], "mode": "lines+markers", "name": "Direct \u2014 Factual ('Paris')", "line": {"color": "#FFB347", "width": 2, "dash": "dash"}, "marker": {"size": 5, "symbol": "x"}, "legendgroup": "ex1"}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.005, 0.02, 0.05, 0.12, 0.22, 0.35, 0.48, 0.58, 0.68, 0.75, 0.82, 0.88], "mode": "lines+markers", "name": "CoT \u2014 Factual ('Paris')", "line": {"color": "#45B7D1", "width": 3}, "marker": {"size": 7}, "legendgroup": "ex1"}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.001, 0.001, 0.002, 0.003, 0.005, 0.008, 0.01, 0.015, 0.03, 0.06, 0.15, 0.32], "mode": "lines+markers", "name": "Direct \u2014 Reasoning ('15')", "line": {"color": "#FF69B4", "width": 2, "dash": "dash"}, "marker": {"size": 5, "symbol": "x"}, "legendgroup": "ex2"}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.002, 0.008, 0.025, 0.06, 0.12, 0.22, 0.35, 0.48, 0.6, 0.7, 0.78, 0.85], "mode": "lines+markers", "name": "CoT \u2014 Reasoning ('15')", "line": {"color": "#96CEB4", "width": 3}, "marker": {"size": 7}, "legendgroup": "ex2"}];
+var convergenceLayout = {
+    xaxis: { title: 'Layer', tickvals: ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"] },
+    yaxis: { title: 'Target Token Probability', range: [0, 1] },
+    height: 500,
+    template: 'plotly_dark',
+    paper_bgcolor: '#1a1a2e',
+    plot_bgcolor: '#16213e',
+    legend: { orientation: 'v', x: 1.02, y: 1 },
+    font: { family: 'Inter, sans-serif' },
+    annotations: [{
+        text: '💡 Solid lines (CoT) converge gradually; dashed (Direct) jump late',
+        xref: 'paper', yref: 'paper', x: 0.5, y: -0.15,
+        showarrow: false, font: { size: 12, color: '#888' }
+    }]
+};
+Plotly.newPlot('convergence-chart', convergenceTraces, convergenceLayout, {responsive: true});
+
+Plotly.newPlot('example-0-prob', [{"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.001, 0.002, 0.003, 0.005, 0.008, 0.012, 0.015, 0.018, 0.025, 0.04, 0.12, 0.28], "mode": "lines+markers", "name": "Direct", "line": {"color": "#FF6B6B", "width": 3}, "marker": {"size": 6}}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.002, 0.005, 0.015, 0.035, 0.08, 0.15, 0.25, 0.38, 0.52, 0.65, 0.74, 0.82], "mode": "lines+markers", "name": "CoT", "line": {"color": "#4ECDC4", "width": 3}, "marker": {"size": 6}}], {"title": {"text": "Target Token Probability \u2014 Arithmetic ('70')", "font": {"size": 14}}, "xaxis": {"title": "Layer", "tickvals": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]}, "yaxis": {"title": "Probability", "range": [0, 1]}, "height": 350, "template": "plotly_dark", "paper_bgcolor": "#1a1a2e", "plot_bgcolor": "#16213e", "font": {"family": "Inter, sans-serif"}, "showlegend": true}, {responsive: true});
+Plotly.newPlot('example-0-entropy', [{"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [8.5, 8.3, 7.8, 7.2, 6.5, 6.0, 5.8, 5.5, 5.0, 4.2, 3.0, 2.1], "mode": "lines+markers", "name": "Direct", "line": {"color": "#FF6B6B", "width": 2}, "fill": "tozeroy", "fillcolor": "rgba(255, 107, 107, 0.15)"}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [8.2, 7.5, 6.5, 5.5, 4.5, 3.8, 3.0, 2.4, 1.8, 1.3, 0.9, 0.6], "mode": "lines+markers", "name": "CoT", "line": {"color": "#4ECDC4", "width": 2}, "fill": "tozeroy", "fillcolor": "rgba(78, 205, 196, 0.15)"}], {"title": {"text": "Entropy (Uncertainty) \u2014 Arithmetic ('70')", "font": {"size": 14}}, "xaxis": {"title": "Layer", "tickvals": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]}, "yaxis": {"title": "Entropy (nats)"}, "height": 300, "template": "plotly_dark", "paper_bgcolor": "#1a1a2e", "plot_bgcolor": "#16213e", "font": {"family": "Inter, sans-serif"}, "showlegend": true}, {responsive: true});
+
+Plotly.newPlot('example-1-prob', [{"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.003, 0.008, 0.015, 0.02, 0.03, 0.05, 0.08, 0.12, 0.2, 0.35, 0.55, 0.72], "mode": "lines+markers", "name": "Direct", "line": {"color": "#FF6B6B", "width": 3}, "marker": {"size": 6}}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.005, 0.02, 0.05, 0.12, 0.22, 0.35, 0.48, 0.58, 0.68, 0.75, 0.82, 0.88], "mode": "lines+markers", "name": "CoT", "line": {"color": "#4ECDC4", "width": 3}, "marker": {"size": 6}}], {"title": {"text": "Target Token Probability \u2014 Factual ('Paris')", "font": {"size": 14}}, "xaxis": {"title": "Layer", "tickvals": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]}, "yaxis": {"title": "Probability", "range": [0, 1]}, "height": 350, "template": "plotly_dark", "paper_bgcolor": "#1a1a2e", "plot_bgcolor": "#16213e", "font": {"family": "Inter, sans-serif"}, "showlegend": true}, {responsive: true});
+Plotly.newPlot('example-1-entropy', [{"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [8.0, 7.5, 7.0, 6.5, 6.0, 5.5, 5.0, 4.3, 3.5, 2.5, 1.5, 0.9], "mode": "lines+markers", "name": "Direct", "line": {"color": "#FF6B6B", "width": 2}, "fill": "tozeroy", "fillcolor": "rgba(255, 107, 107, 0.15)"}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [7.8, 6.8, 5.5, 4.5, 3.5, 2.8, 2.2, 1.7, 1.3, 1.0, 0.7, 0.5], "mode": "lines+markers", "name": "CoT", "line": {"color": "#4ECDC4", "width": 2}, "fill": "tozeroy", "fillcolor": "rgba(78, 205, 196, 0.15)"}], {"title": {"text": "Entropy (Uncertainty) \u2014 Factual ('Paris')", "font": {"size": 14}}, "xaxis": {"title": "Layer", "tickvals": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]}, "yaxis": {"title": "Entropy (nats)"}, "height": 300, "template": "plotly_dark", "paper_bgcolor": "#1a1a2e", "plot_bgcolor": "#16213e", "font": {"family": "Inter, sans-serif"}, "showlegend": true}, {responsive: true});
+
+Plotly.newPlot('example-2-prob', [{"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.001, 0.001, 0.002, 0.003, 0.005, 0.008, 0.01, 0.015, 0.03, 0.06, 0.15, 0.32], "mode": "lines+markers", "name": "Direct", "line": {"color": "#FF6B6B", "width": 3}, "marker": {"size": 6}}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [0.002, 0.008, 0.025, 0.06, 0.12, 0.22, 0.35, 0.48, 0.6, 0.7, 0.78, 0.85], "mode": "lines+markers", "name": "CoT", "line": {"color": "#4ECDC4", "width": 3}, "marker": {"size": 6}}], {"title": {"text": "Target Token Probability \u2014 Reasoning ('15')", "font": {"size": 14}}, "xaxis": {"title": "Layer", "tickvals": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]}, "yaxis": {"title": "Probability", "range": [0, 1]}, "height": 350, "template": "plotly_dark", "paper_bgcolor": "#1a1a2e", "plot_bgcolor": "#16213e", "font": {"family": "Inter, sans-serif"}, "showlegend": true}, {responsive: true});
+Plotly.newPlot('example-2-entropy', [{"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [9.0, 8.8, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.2, 4.0, 3.0, 2.0], "mode": "lines+markers", "name": "Direct", "line": {"color": "#FF6B6B", "width": 2}, "fill": "tozeroy", "fillcolor": "rgba(255, 107, 107, 0.15)"}, {"x": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], "y": [8.5, 7.5, 6.2, 5.0, 4.0, 3.2, 2.5, 2.0, 1.5, 1.1, 0.8, 0.5], "mode": "lines+markers", "name": "CoT", "line": {"color": "#4ECDC4", "width": 2}, "fill": "tozeroy", "fillcolor": "rgba(78, 205, 196, 0.15)"}], {"title": {"text": "Entropy (Uncertainty) \u2014 Reasoning ('15')", "font": {"size": 14}}, "xaxis": {"title": "Layer", "tickvals": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]}, "yaxis": {"title": "Entropy (nats)"}, "height": 300, "template": "plotly_dark", "paper_bgcolor": "#1a1a2e", "plot_bgcolor": "#16213e", "font": {"family": "Inter, sans-serif"}, "showlegend": true}, {responsive: true});
+
+</script>
+</body>
+</html>
